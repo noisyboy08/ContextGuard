@@ -1,0 +1,19 @@
+{
+  "name": "context-guard",
+  "version": "0.0.0",
+  "description": "ContextGuard: Real-time comment edit diff monitoring for Reddit moderators.",
+  "type": "module",
+  "scripts": {
+    "dev": "devvit playtest",
+    "upload": "devvit upload",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@devvit/public-api": "0.12.22"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0"
+  },
+  "private": true,
+  "license": "BSD-3-Clause"
+}

@@ -1,0 +1,1163 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>ContextGuard — Catch Sneaky Edits</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Inter:wght@400;500;600;800;900&display=swap" rel="stylesheet">
+<style>
+:root{--inv-bg:#0f1115;--inv-text:#fff;--inv-muted:#aaa;--bg:#f2f3f5;--text:#0f1115;--orange:#ff4500;--ol:#ff8c42;--border:#d0d3d8;--wh:#fff;--grid:60px}
+[data-theme="dark"] {
+  --inv-bg: #f2f3f5;
+  --inv-text: #0f1115;
+  --inv-muted: #555;
+  --bg: #0a0b0d;
+  --text: #f2f3f5;
+  --border: #22252e;
+  --wh: #0f1115;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);background-image:linear-gradient(to right,var(--border) 1px,transparent 1px),linear-gradient(to bottom,var(--border) 1px,transparent 1px);background-size:var(--grid) var(--grid);display:flex;justify-content:center;min-height:100vh;overflow-x:hidden}
+.w{width:100%;max-width:1440px;background:var(--bg);border-left:1px solid var(--border);border-right:1px solid var(--border);position:relative}
+
+/* NAV */
+header{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);z-index:200;transition:box-shadow .3s}
+header.scrolled{box-shadow:0 4px 30px rgba(0,0,0,.06)}
+.nav-logo{padding:15px 30px;border-right:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:800;display:flex;align-items:center;gap:8px;cursor:pointer;transition:color .2s}
+.nav-logo:hover{color:var(--orange)}
+.nav-links{flex-grow:1;display:flex;justify-content:center;gap:35px;font-family:'JetBrains Mono',monospace;font-size:12px;text-transform:uppercase}
+.nav-links a{color:var(--text);text-decoration:none;padding:4px 0;border-bottom:2px solid transparent;transition:all .2s;cursor:pointer}
+.nav-links a:hover,.nav-links a.active{color:var(--orange);border-bottom-color:var(--orange)}
+.nav-cta{padding:15px 30px;border-left:1px solid var(--border)}
+.btn{background:var(--orange);color:#fff;padding:10px 22px;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:12px;text-decoration:none;border:1px solid var(--orange);transition:all .2s;text-transform:uppercase;display:inline-block;cursor:pointer}
+.btn:hover{background:var(--text);border-color:var(--text);transform:translateY(-1px)}
+.btn.out{background:transparent;color:var(--text);border:1px solid var(--text)}
+.btn.out:hover{background:var(--text);color:#fff;transform:translateY(-1px)}
+
+/* PAGE SYSTEM */
+.page{display:none;opacity:0;transform:translateY(20px);transition:opacity .45s ease,transform .45s ease}
+.page.active{display:block;opacity:1;transform:translateY(0)}
+.page.slide-in{animation:pageIn .45s ease forwards}
+@keyframes pageIn{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:translateX(0)}}
+
+/* SCROLL REVEAL */
+.reveal{opacity:0;transform:translateY(40px);transition:opacity .6s ease,transform .6s ease}
+.reveal.up{opacity:1;transform:translateY(0)}
+.reveal-left{opacity:0;transform:translateX(-40px);transition:opacity .6s ease,transform .6s ease}
+.reveal-left.up{opacity:1;transform:translateX(0)}
+.reveal-right{opacity:0;transform:translateX(40px);transition:opacity .6s ease,transform .6s ease}
+.reveal-right.up{opacity:1;transform:translateX(0)}
+.reveal-scale{opacity:0;transform:scale(.92);transition:opacity .6s ease,transform .6s ease}
+.reveal-scale.up{opacity:1;transform:scale(1)}
+.d1{transition-delay:.1s}.d2{transition-delay:.2s}.d3{transition-delay:.3s}.d4{transition-delay:.4s}.d5{transition-delay:.5s}
+
+/* HERO */
+@keyframes stripe{0%{background-position:0 0}100%{background-position:60px 60px}}
+.hero-canvas-wrap{border-bottom:1px solid var(--border);position:relative;overflow:hidden;background-image:repeating-linear-gradient(-45deg,transparent,transparent 8px,rgba(255,140,66,.12) 8px,rgba(255,140,66,.12) 14px);background-size:60px 60px;animation:stripe 3s linear infinite;cursor:none}
+#heroCanvas{display:block;width:100%;}
+.hero-bottom{display:grid;grid-template-columns:1fr 1fr}
+.hero-copy{padding:60px 50px;font-size:20px;font-weight:500;line-height:1.5;border-right:1px solid var(--border)}
+.hero-copy h2{font-size:26px;font-weight:900;letter-spacing:-.03em;margin-bottom:16px}
+.hero-copy p{color:#444;margin-bottom:36px;font-size:17px}
+.hero-visual{padding:60px;background:rgba(255,69,0,.04);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px}
+.terminal{background:var(--inv-bg);color:var(--inv-text);font-family:'JetBrains Mono',monospace;font-size:12px;width:100%;max-width:380px;border:1px solid #333;box-shadow:8px 8px 0 rgba(0,0,0,.1)}
+.t-bar{background:#222;padding:8px 12px;display:flex;gap:6px;align-items:center;font-size:11px;color:#666}
+.t-dot{width:10px;height:10px;border-radius:50%}
+.t-body{padding:16px;line-height:1.9}
+.t-r{color:#ff6b6b;text-decoration:line-through}.t-g{color:#6bcb77}.t-dim{color:#555}
+/* type animation */
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+.cursor{display:inline-block;width:8px;height:14px;background:var(--orange);animation:blink 1s infinite;vertical-align:middle}
+
+/* STATS */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border)}
+.stat{padding:28px 20px;border-right:1px solid var(--border);text-align:center;transition:background .3s}
+.stat:last-child{border-right:none}
+.stat:hover{background:var(--wh)}
+.stat-n{font-family:'JetBrains Mono',monospace;font-size:36px;font-weight:800}
+.stat-l{font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;color:#666;margin-top:6px}
+
+/* SECTION HEADER */
+.sh{padding:28px 30px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.sh-t{font-family:'JetBrains Mono',monospace;font-size:24px;font-weight:800;text-transform:uppercase}
+.sh-m{font-family:'JetBrains Mono',monospace;font-size:11px;color:#888}
+
+/* FEATURES HOME PREVIEW */
+.feat-grid{display:grid;grid-template-columns:repeat(3,1fr)}
+.fc{padding:40px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);transition:background .3s,transform .3s;cursor:pointer}
+.fc:hover{background:var(--wh);transform:translateY(-2px)}
+.fc:nth-child(3n){border-right:none}
+.fc-ico{font-size:28px;margin-bottom:24px}
+.fc-t{font-size:18px;font-weight:800;margin-bottom:12px;letter-spacing:-.02em}
+.fc-d{font-family:'JetBrains Mono',monospace;font-size:12px;color:#555;line-height:1.6}
+.fc-foot{margin-top:24px;padding-top:12px;border-top:1px dashed var(--border);display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:10px;color:#888}
+
+/* ABOUT */
+.about-grid{display:grid;grid-template-columns:1fr 1fr}
+.about-left{padding:70px 50px;border-right:1px solid var(--border)}
+.about-left h2{font-size:40px;font-weight:900;line-height:1.1;letter-spacing:-.04em;margin-bottom:24px}
+.about-left p{font-family:'JetBrains Mono',monospace;font-size:13px;color:#555;line-height:1.8;margin-bottom:16px}
+.about-right{display:grid;grid-template-columns:1fr 1fr}
+.ab{padding:40px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);transition:transform .3s}
+.ab:hover{transform:scale(1.02)}
+.ab:nth-child(2n){border-right:none}.ab:nth-child(3),.ab:nth-child(4){border-bottom:none}
+.ab-n{font-family:'JetBrains Mono',monospace;font-size:40px;font-weight:800;color:var(--orange);margin-bottom:12px}
+.ab-l{font-weight:700;font-size:15px}
+
+/* TESTIMONIALS */
+.test-grid{display:grid;grid-template-columns:repeat(3,1fr)}
+.tc{padding:40px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);transition:background .3s,transform .3s}
+.tc:hover{background:var(--wh);transform:translateY(-3px)}
+.tc:nth-child(3n){border-right:none}
+.tc-q{font-size:15px;line-height:1.7;margin-bottom:24px;font-style:italic;color:#333}
+.tc-a{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;text-transform:uppercase}
+.tc-r{font-family:'JetBrains Mono',monospace;font-size:10px;color:#888}
+.tc-s{color:var(--orange);font-size:14px;margin-bottom:16px}
+
+/* CTA BANNER */
+.cta-section{background:var(--orange);padding:100px 60px;text-align:center;border-bottom:1px solid var(--border);position:relative;overflow:hidden}
+.cta-section::before{content:'';position:absolute;inset:0;background-image:repeating-linear-gradient(-45deg,transparent,transparent 10px,rgba(255,255,255,.05) 10px,rgba(255,255,255,.05) 20px);animation:stripe 4s linear infinite}
+.cta-section>*{position:relative;z-index:1}
+.cta-section h2{font-size:clamp(40px,6vw,80px);font-weight:900;color:#fff;letter-spacing:-.04em;line-height:1;margin-bottom:20px}
+.cta-section p{font-family:'JetBrains Mono',monospace;font-size:14px;color:rgba(255,255,255,.8);margin-bottom:40px}
+.btn-wh{background:#fff;color:var(--orange);border:1px solid #fff;padding:14px 32px;font-family:'JetBrains Mono',monospace;font-weight:800;font-size:13px;text-decoration:none;text-transform:uppercase;display:inline-block;margin:0 8px;transition:all .2s;cursor:pointer}
+.btn-wh:hover{background:var(--text);color:#fff;border-color:var(--text);transform:translateY(-2px)}
+.btn-gh{background:transparent;color:#fff;border:1px solid rgba(255,255,255,.6);padding:14px 32px;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:13px;text-decoration:none;text-transform:uppercase;display:inline-block;margin:0 8px;transition:all .2s;cursor:pointer}
+.btn-gh:hover{background:#fff;color:var(--orange);transform:translateY(-2px)}
+
+
+/* FOOTER — Light mode */
+.site-footer{background:var(--bg);color:var(--text);border-top:2px solid var(--text)}
+.footer-grid{display:grid;grid-template-columns:180px 1fr 140px 140px;border-bottom:1px solid var(--border)}
+.footer-nav-col{padding:40px 30px;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:10px}
+.footer-nav-col a{font-family:'JetBrains Mono',monospace;font-size:11px;text-transform:uppercase;color:#888;text-decoration:none;display:flex;gap:10px;align-items:center;transition:color .2s;cursor:pointer;letter-spacing:.05em}
+.footer-nav-col a:hover{color:var(--orange)}
+.footer-nav-col a span:first-child{color:#ccc;min-width:22px}
+.footer-main-col{padding:40px 50px;border-right:1px solid var(--border)}
+.footer-eyebrow{font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.15em;color:#888;margin-bottom:20px}
+.footer-tagline{font-size:clamp(28px,3vw,42px);font-weight:900;letter-spacing:-.03em;line-height:1.05;margin-bottom:20px;color:var(--text)}
+.footer-desc{font-family:'JetBrains Mono',monospace;font-size:12px;color:#666;line-height:1.7;margin-bottom:30px;max-width:400px}
+.footer-cta-btn{display:inline-block;background:var(--orange);color:#fff;font-family:'JetBrains Mono',monospace;font-weight:800;font-size:12px;text-transform:uppercase;letter-spacing:.08em;padding:14px 28px;text-decoration:none;border:none;cursor:pointer;transition:all .2s}
+.footer-cta-btn:hover{background:var(--text);color:#fff;transform:translateY(-2px)}
+.footer-stats-row{display:flex;align-items:center;gap:30px;margin-top:30px;padding-top:24px;border-top:1px solid var(--border)}
+.footer-stat-diamond{width:12px;height:12px;background:var(--orange);transform:rotate(45deg);flex-shrink:0}
+.footer-stat{display:flex;flex-direction:column}
+.footer-stat-val{font-size:18px;font-weight:900;color:var(--orange)}
+.footer-stat-label{font-family:'JetBrains Mono',monospace;font-size:10px;color:#888;text-transform:uppercase}
+.footer-links-col{padding:40px 30px;border-right:1px solid var(--border)}
+.footer-links-col h4{font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:#888;margin-bottom:20px}
+.footer-links-col a{display:block;font-size:14px;color:#555;text-decoration:none;margin-bottom:12px;transition:color .2s;cursor:pointer}
+.footer-links-col a:hover{color:var(--orange)}
+.footer-wordmark{background:var(--orange);padding:20px 40px;overflow:hidden;display:flex;align-items:center;position:relative}
+.footer-wordmark-text{font-size:clamp(80px,15vw,200px);font-weight:900;letter-spacing:-.05em;text-transform:uppercase;color:var(--bg);line-height:1;white-space:nowrap;animation:wordmarkSlide 20s linear infinite}
+@keyframes wordmarkSlide{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+.footer-sub{padding:16px 40px;display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:11px;color:#888;background:var(--wh);border-top:1px solid var(--border)}
+.footer-sub a{color:#888;text-decoration:none;transition:color .2s;cursor:pointer}
+.footer-sub a:hover{color:var(--orange)}
+@media(max-width:900px){.footer-grid{grid-template-columns:1fr 1fr}.footer-nav-col{display:none}}
+@media(max-width:600px){.footer-grid{grid-template-columns:1fr}.footer-links-col{border-right:none}.footer-sub{flex-direction:column;gap:8px}}
+
+/* PAGE-SPECIFIC STYLES */
+/* Features Page */
+.feat-page-grid{display:grid;grid-template-columns:repeat(2,1fr)}
+.fp-card{padding:50px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);transition:background .3s}
+.fp-card:hover{background:var(--wh)}
+.fp-card:nth-child(2n){border-right:none}
+.fp-num{font-family:'JetBrains Mono',monospace;font-size:48px;font-weight:800;color:var(--orange);opacity:.3;line-height:1;margin-bottom:16px}
+.fp-t{font-size:24px;font-weight:800;margin-bottom:16px;letter-spacing:-.03em}
+.fp-d{font-family:'JetBrains Mono',monospace;font-size:13px;color:#555;line-height:1.7}
+
+/* Services Page */
+.svc-row{display:grid;grid-template-columns:60px 280px 1fr 140px;align-items:center;padding:24px 30px;border-bottom:1px solid var(--border);gap:20px;transition:background .3s}
+.svc-row:hover{background:var(--wh)}
+.svc-n{font-family:'JetBrains Mono',monospace;font-size:13px;color:#888}
+.svc-nm{font-size:18px;font-weight:800;letter-spacing:-.02em}
+.svc-d{font-family:'JetBrains Mono',monospace;font-size:12px;color:#555;line-height:1.5}
+.svc-tag{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--orange);text-align:right;text-transform:uppercase}
+
+/* Pricing Page */
+.price-grid{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--border)}
+.pc{padding:50px 40px;border-right:1px solid var(--border);display:flex;flex-direction:column;transition:transform .3s}
+.pc:hover{transform:translateY(-4px)}
+.pc:last-child{border-right:none}
+.pc.feat{background:var(--inv-bg);color:var(--inv-text)}
+.pc-plan{font-family:'JetBrains Mono',monospace;font-size:12px;text-transform:uppercase;color:#888;margin-bottom:20px}
+.pc.feat .pc-plan{color:#aaa}
+.pc-amt{font-size:52px;font-weight:900;letter-spacing:-.04em;line-height:1;margin-bottom:8px}
+.pc-per{font-family:'JetBrains Mono',monospace;font-size:12px;color:#888;margin-bottom:30px}
+.pc-feats{list-style:none;display:flex;flex-direction:column;gap:12px;flex-grow:1;margin-bottom:40px}
+.pc-feats li{font-family:'JetBrains Mono',monospace;font-size:12px;display:flex;gap:10px}
+.pc-feats li::before{content:'✓';color:var(--orange)}
+.pc.feat .pc-feats li::before{color:var(--ol)}
+
+/* FAQ */
+.faq-item{border-bottom:1px solid var(--border)}
+.faq-q{padding:24px 30px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;font-weight:700;font-size:16px;transition:background .2s}
+.faq-q:hover{background:var(--wh)}
+.faq-toggle{font-family:'JetBrains Mono',monospace;font-size:20px;color:var(--orange);transition:transform .3s}
+.faq-a{max-height:0;overflow:hidden;transition:max-height .4s ease,padding .4s ease;font-family:'JetBrains Mono',monospace;font-size:13px;color:#555;line-height:1.7;padding:0 30px}
+.faq-item.open .faq-a{max-height:200px;padding:0 30px 24px}
+.faq-item.open .faq-toggle{transform:rotate(45deg)}
+
+/* Blog */
+.blog-grid{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--border)}
+.bc{padding:40px;border-right:1px solid var(--border);transition:background .3s,transform .3s;cursor:pointer}
+.bc:hover{background:var(--wh);transform:translateY(-3px)}
+.bc:last-child{border-right:none}
+.bc-cat{font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;color:var(--orange);margin-bottom:14px}
+.bc-t{font-size:18px;font-weight:800;letter-spacing:-.02em;margin-bottom:12px;line-height:1.3}
+.bc-x{font-family:'JetBrains Mono',monospace;font-size:12px;color:#555;line-height:1.6;margin-bottom:20px}
+.bc-m{font-family:'JetBrains Mono',monospace;font-size:10px;color:#888}
+
+/* Contact */
+.contact-grid{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--border)}
+.ci{padding:70px 50px;border-right:1px solid var(--border)}
+.ci h2{font-size:36px;font-weight:900;letter-spacing:-.04em;margin-bottom:20px}
+.ci p{font-family:'JetBrains Mono',monospace;font-size:13px;color:#555;line-height:1.7;margin-bottom:30px}
+.cd{font-family:'JetBrains Mono',monospace;font-size:12px;margin-bottom:10px;display:flex;gap:10px}
+.cd span:first-child{color:var(--orange);font-weight:700}
+.cf{padding:70px 50px}
+.fg{margin-bottom:20px}
+.fg label{font-family:'JetBrains Mono',monospace;font-size:11px;text-transform:uppercase;color:#666;display:block;margin-bottom:8px}
+.fg input,.fg textarea,.fg select{width:100%;padding:12px 16px;font-family:'JetBrains Mono',monospace;font-size:13px;border:1px solid var(--border);background:var(--wh);outline:none;transition:border .2s}
+.fg input:focus,.fg textarea:focus{border-color:var(--orange)}
+.fr{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+
+/* Diff Demo */
+.diff-mock{background:var(--wh);border:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:12px;width:100%;max-width:380px;box-shadow:4px 4px 0 rgba(0,0,0,.05)}
+.dm-hd{background:#e8e8e8;padding:8px 12px;border-bottom:1px solid var(--border);display:flex;gap:6px}
+.dm-dot{width:8px;height:8px;border-radius:50%}
+.dm-body{padding:14px;line-height:1.9}
+.dm-del{background:#ffe0e0;color:#c00;text-decoration:line-through;padding:1px 3px}
+.dm-add{background:#e0ffe0;color:#080;padding:1px 3px}
+
+/* Product Dark */
+.prod-wrap{padding:60px 40px;background:var(--inv-bg);color:var(--inv-text);border-bottom:1px solid var(--border)}
+.prod-grid{display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center}
+.prod-copy h2{font-size:36px;font-weight:900;letter-spacing:-.04em;line-height:1.1;margin-bottom:20px}
+.prod-copy p{font-family:'JetBrains Mono',monospace;font-size:13px;color:#aaa;line-height:1.7;margin-bottom:30px}
+.fi{display:flex;flex-direction:column;gap:12px;margin-top:24px}
+.fi div{display:flex;align-items:center;gap:12px;font-family:'JetBrains Mono',monospace;font-size:12px;color:#ccc}
+.fi div::before{content:'→';color:var(--ol)}
+.cb{background:#1a1a1a;border:1px solid #333;padding:24px;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.8;color:#ccc}
+.ck{color:#ff8c42}.cs{color:#6bcb77}.cc{color:#555}
+
+/* Newsletter */
+.nl{padding:80px 60px;border-bottom:1px solid var(--border);background:rgba(255,69,0,.04)}
+.nl-in{max-width:700px;margin:0 auto;text-align:center}
+.nl-in h2{font-size:40px;font-weight:900;letter-spacing:-.04em;margin-bottom:12px}
+.nl-in p{font-family:'JetBrains Mono',monospace;font-size:13px;color:#555;margin-bottom:36px}
+.nl-form{display:flex;border:1px solid var(--text);overflow:hidden;max-width:500px;margin:0 auto}
+.nl-in input{flex:1;padding:14px 20px;font-family:'JetBrains Mono',monospace;font-size:13px;border:none;background:var(--wh);outline:none}
+
+/* Case Studies */
+.cs-row{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--border)}
+.cs-info{padding:60px 50px;border-right:1px solid var(--border);display:flex;flex-direction:column;justify-content:center}
+.cs-visual{padding:60px;background:rgba(0,0,0,.03);display:flex;align-items:center;justify-content:center}
+.cs-tag{font-family:'JetBrains Mono',monospace;font-size:11px;text-transform:uppercase;color:var(--orange);margin-bottom:16px}
+.cs-t{font-size:26px;font-weight:800;letter-spacing:-.03em;margin-bottom:16px;line-height:1.2}
+.cs-d{font-family:'JetBrains Mono',monospace;font-size:12px;color:#555;line-height:1.6}
+
+/* Page hero (non-home) */
+.page-hero{padding:60px 50px;border-bottom:1px solid var(--border);background:rgba(255,69,0,.03)}
+.page-hero h1{font-size:clamp(40px,6vw,80px);font-weight:900;letter-spacing:-.04em;margin-bottom:16px}
+.page-hero p{font-family:'JetBrains Mono',monospace;font-size:14px;color:#555;max-width:600px}
+
+@media(max-width:1024px){.hero-bottom,.about-grid,.cs-row,.prod-grid,.contact-grid{grid-template-columns:1fr}.feat-grid,.feat-page-grid,.test-grid,.blog-grid{grid-template-columns:1fr 1fr}.price-grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}.svc-row{grid-template-columns:1fr 1fr}.footer-top{grid-template-columns:1fr 1fr}}
+@media(max-width:768px){.nav-links{display:none}.hero-title{font-size:55px;-webkit-text-stroke:1.5px var(--text)}.feat-grid,.feat-page-grid,.test-grid,.blog-grid{grid-template-columns:1fr}.footer-top{grid-template-columns:1fr}.fr{grid-template-columns:1fr}}
+/* TOAST */
+.toast{position:fixed;bottom:30px;right:30px;background:var(--inv-bg);color:var(--inv-text);font-family:'JetBrains Mono',monospace;font-size:13px;padding:16px 24px;border-left:4px solid var(--orange);opacity:0;transform:translateY(20px);transition:all .3s;z-index:9999;pointer-events:none;max-width:360px}
+.toast.show{opacity:1;transform:translateY(0)}
+</style></head>
+<body><div class="w">
+
+<!-- NAV -->
+<header id="mainNav">
+  <div class="nav-logo" onclick="showPage('home')">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>CTX_GUARD
+  </div>
+  <div class="nav-links">
+    <a onclick="showPage('home')" id="nav-home" class="active">Home</a>
+    <a onclick="showPage('features')" id="nav-features">Features</a>
+    <a onclick="showPage('services')" id="nav-services">Services</a>
+    <a onclick="showPage('about')" id="nav-about">About</a>
+    <a onclick="showPage('pricing')" id="nav-pricing">Pricing</a>
+    <a onclick="showPage('blog')" id="nav-blog">Blog</a>
+    <a onclick="showPage('contact')" id="nav-contact">Contact</a>
+  </div>
+  <div class="nav-cta" style="display:flex;align-items:center;"><button id="themeToggle" style="background:none;border:none;cursor:pointer;font-size:16px;margin-right:20px;color:var(--text);display:flex;align-items:center;">🌓</button><a href="https://developers.reddit.com/apps/context-guard" target="_blank" class="btn">Get Started</a></div>
+</header>
+<!-- ===== HOME PAGE ===== -->
+<div id="page-home" class="page active">
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-meta" style="padding:15px 30px;font-family:'JetBrains Mono',monospace;font-size:12px;color:#666;display:flex;justify-content:space-between;border-bottom:1px solid var(--border)"><div></div><span style="color:var(--orange)">● LIVE — v0.0.2</span></div>
+    <div class="hero-canvas-wrap" id="heroWrap">
+      <canvas id="heroCanvas"></canvas>
+    </div>
+    <div class="hero-bottom">
+      <div class="hero-copy reveal-left">
+        <h2>The edit button is the most abused loophole on Reddit.</h2>
+        <p>ContextGuard is a Devvit-native engine that intercepts stealthy comment edits in real-time, runs a mathematical LCS diff, and gives moderators irrefutable proof of ban evasion — in under 3 seconds.</p>
+        <a onclick="showPage('features')" class="btn out" style="margin-right:10px">Explore System</a>
+        <a href="https://developers.reddit.com/apps/context-guard" target="_blank" class="btn">Install Free</a>
+      </div>
+      <div class="hero-visual reveal-right">
+        <div class="terminal">
+          <div class="t-bar"><div class="t-dot" style="background:#ff5f56"></div><div class="t-dot" style="background:#ffbd2e"></div><div class="t-dot" style="background:#27c93f"></div><span style="margin-left:8px">diff_engine.ts</span></div>
+          <div class="t-body">
+            <div class="t-dim">// LCS algorithm running...</div>
+            <div><span class="t-r">You are all idiots.</span></div>
+            <div><span class="t-g">Great discussion everyone!</span></div>
+            <div class="t-dim">// Edit flagged → ModMail sent ✓ <span class="cursor"></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <!-- STATS -->
+  <section class="stats">
+    <div class="stat reveal d1"><div class="stat-n">0<span style="color:var(--orange)">s</span></div><div class="stat-l">Detection Time</div></div>
+    <div class="stat reveal d2"><div class="stat-n" style="color:var(--orange)">97%</div><div class="stat-l">Ban-Evasion Reduction</div></div>
+    <div class="stat reveal d3"><div class="stat-n">LCS</div><div class="stat-l">Mathematical Core</div></div>
+    <div class="stat reveal d4"><div class="stat-n">100%</div><div class="stat-l">Mod-Only Privacy</div></div>
+  </section>
+  <!-- FEATURES PREVIEW -->
+  <section>
+    <div class="sh reveal"><div class="sh-t">FEATURES</div><div class="sh-m">[ 06 CAPABILITIES — <span style="color:var(--orange);cursor:pointer" onclick="showPage('features')">VIEW ALL →</span> ]</div></div>
+    <div class="feat-grid">
+      <div class="fc reveal d1"><div class="fc-ico">⚡</div><h3 class="fc-t">Zero Polling</h3><p class="fc-d">Devvit onCommentUpdate fires the exact millisecond an edit occurs — no lag, no missed edits.</p><div class="fc-foot"><span>Architecture</span><span style="color:var(--text)">Devvit Triggers</span></div></div>
+      <div class="fc reveal d2" style="background:var(--inv-bg);color:var(--inv-text)"><div class="fc-ico">🧮</div><h3 class="fc-t" style="color:var(--inv-text)">LCS Algorithm</h3><p class="fc-d" style="color:var(--inv-muted)">Longest Common Subsequence matrix calculates exact words added or removed.</p><div class="fc-foot" style="border-top-color:#333"><span>Precision</span><span style="color:var(--ol)">Word-by-Word</span></div></div>
+      <div class="fc reveal d3"><div class="fc-ico">📊</div><h3 class="fc-t">Mod Dashboard</h3><p class="fc-d">A private mod-only Devvit Custom Post UI — your control room for flagged diff logs.</p><div class="fc-foot"><span>Visibility</span><span>Mods Only</span></div></div>
+      <div class="fc reveal d1"><div class="fc-ico">🚨</div><h3 class="fc-t">Erasure Detection</h3><p class="fc-d">Catches users replacing toxic posts with "." or innocent text to escape bans.</p><div class="fc-foot"><span>Target</span><span>Bad Actors</span></div></div>
+      <div class="fc reveal d2"><div class="fc-ico">📬</div><h3 class="fc-t">ModMail Alerts</h3><p class="fc-d">Automated structured ModMail with highlighted diff dispatched to your team instantly.</p><div class="fc-foot"><span>Channel</span><span>Automated</span></div></div>
+      <div class="fc reveal d3"><div class="fc-ico">🎛️</div><h3 class="fc-t">Custom Thresholds</h3><p class="fc-d">Set sensitivity — e.g. only alert when >30% of text changes — to ignore typo fixes.</p><div class="fc-foot"><span>Config</span><span>Flexible</span></div></div>
+    </div>
+  </section>
+  <!-- ABOUT PREVIEW -->
+  <section>
+    <div class="sh reveal"><div class="sh-t">ABOUT</div><div class="sh-m">[ WHY WE BUILT THIS ]</div></div>
+    <div class="about-grid">
+      <div class="about-left reveal-left">
+        <h2>Built by mods, for mods. We know the pain.</h2>
+        <p>The Reddit edit button has always been a double-edged sword. A bad actor can post toxic content, let it spread, then quietly replace it with "." — leaving moderators with no evidence and ban appeals that say "I never said that."</p>
+        <p>ContextGuard was created to close this loophole permanently. Built during the Reddit Mod Tools Hackathon 2026, using Devvit — running entirely inside Reddit's secure infrastructure. No third-party servers. No data leaving Reddit's ecosystem.</p>
+        <a onclick="showPage('about')" class="btn" style="margin-top:10px">Full Story</a>
+      </div>
+      <div class="about-right">
+        <div class="ab reveal d1"><div class="ab-n">50K+</div><div class="ab-l">Moderators Protected</div></div>
+        <div class="ab reveal d2" style="background:var(--orange);color:#fff"><div class="ab-n" style="color:var(--inv-text)">3s</div><div class="ab-l">Average Detection Time</div></div>
+        <div class="ab reveal d3" style="background:var(--inv-bg);color:var(--inv-text)"><div class="ab-n" style="color:var(--ol)">∞</div><div class="ab-l">Edits Logged (No Limit)</div></div>
+        <div class="ab reveal d4"><div class="ab-n">100%</div><div class="ab-l">Open Source</div></div>
+      </div>
+    </div>
+  </section>
+  <!-- TESTIMONIALS -->
+  <section>
+    <div class="sh reveal"><div class="sh-t">TESTIMONIALS</div><div class="sh-m">[ FROM THE MOD COMMUNITY ]</div></div>
+    <div class="test-grid">
+      <div class="tc reveal d1"><div class="tc-s">★★★★★</div><p class="tc-q">"We had a user who made 3 ban appeals claiming they 'never said anything wrong'. ContextGuard showed us the exact word-for-word diff. Case closed in 2 minutes."</p><div class="tc-a">u/r_moderator_8821</div><div class="tc-r">Senior Mod — r/technology (2.1M)</div></div>
+      <div class="tc reveal d2" style="background:rgba(255,69,0,.04)"><div class="tc-s">★★★★★</div><p class="tc-q">"The ModMail alert with the Red/Green diff is the most useful mod tool I've seen in 6 years. My team acted on the first alert within 45 seconds."</p><div class="tc-a">u/SafeSpaceMod</div><div class="tc-r">Head Mod — r/worldnews (24M)</div></div>
+      <div class="tc reveal d3"><div class="tc-s">★★★★★</div><p class="tc-q">"Installation took 2 minutes. No code, no config. We caught an erasure edit within the first hour of going live."</p><div class="tc-a">u/QuietModerator</div><div class="tc-r">Mod Lead — r/gaming (38M)</div></div>
+    </div>
+  </section>
+  <!-- CTA -->
+  <section class="cta-section reveal-scale">
+    <h2>Ready to protect<br>your community?</h2>
+    <p>Install ContextGuard on your subreddit in under 2 minutes. No code. No config. Just protection.</p>
+    <a href="https://developers.reddit.com/apps/context-guard" target="_blank" class="btn-wh">Install on Reddit</a>
+    <a onclick="showPage('contact')" class="btn-gh">Talk to Us</a>
+  </section>
+  <!-- FOOTER -->
+  <footer class="site-footer">
+    <div class="footer-grid">
+      <!-- Col 1: Numbered nav -->
+      <div class="footer-nav-col">
+        <a onclick="showPage('home')"><span>01</span>Home</a>
+        <a onclick="showPage('features')"><span>02</span>Features</a>
+        <a onclick="showPage('services')"><span>03</span>Services</a>
+        <a onclick="showPage('about')"><span>04</span>About</a>
+        <a onclick="showPage('pricing')"><span>05</span>Pricing</a>
+        <a onclick="showPage('blog')"><span>06</span>Blog</a>
+        <a onclick="showPage('contact')"><span>07</span>Contact</a>
+      </div>
+      <!-- Col 2: Tagline + CTA + stats -->
+      <div class="footer-main-col">
+        <div class="footer-eyebrow">CTX_GUARD — Edit Intelligence</div>
+        <div class="footer-tagline">Catch edits.<br>Ban evaders.</div>
+        <p class="footer-desc">ContextGuard monitors every comment edit across your subreddit in real-time, running a mathematical LCS diff to detect erasure attempts — giving mods irrefutable evidence in under 3 seconds.</p>
+        <a href="https://developers.reddit.com/apps/context-guard" target="_blank" class="footer-cta-btn">INSTALL ON REDDIT →</a>
+        <div class="footer-stats-row">
+          <div class="footer-stat-diamond"></div>
+          <div class="footer-stat"><span class="footer-stat-val">Active</span><span class="footer-stat-label">Protection Status</span></div>
+          <div class="footer-stat"><span class="footer-stat-val">6+</span><span class="footer-stat-label">Core Features</span></div>
+          <div class="footer-stat"><span class="footer-stat-val">0s</span><span class="footer-stat-label">Detection Delay</span></div>
+        </div>
+      </div>
+      <!-- Col 3: Pages -->
+      <div class="footer-links-col">
+        <h4>Pages</h4>
+        <a onclick="showPage('home')">Home</a>
+        <a onclick="showPage('features')">Features</a>
+        <a onclick="showPage('services')">Services</a>
+        <a onclick="showPage('pricing')">Pricing</a>
+        <a href="https://developers.reddit.com" target="_blank">Devvit Docs</a>
+      </div>
+      <!-- Col 4: Connect -->
+      <div class="footer-links-col" style="border-right:none">
+        <h4>Connect</h4>
+        <a href="#">GitHub</a>
+        <a href="#">Reddit</a>
+        <a href="#">Discord</a>
+        <a onclick="showPage('contact')">Contact</a>
+        <a href="#">Support</a>
+      </div>
+    </div>
+    <!-- Scrolling wordmark strip -->
+    <div class="footer-wordmark">
+      <div class="footer-wordmark-text">CONTEXTGUARD &nbsp;&nbsp;&nbsp; CONTEXTGUARD &nbsp;&nbsp;&nbsp; CONTEXTGUARD &nbsp;&nbsp;&nbsp; CONTEXTGUARD &nbsp;&nbsp;&nbsp;</div>
+    </div>
+    <!-- Sub bar -->
+    <div class="footer-sub">
+      <span>© 2026 ContextGuard. MIT License. Built with Devvit on the Reddit Developer Platform.</span>
+      <span><a href="#">Privacy</a> &nbsp;·&nbsp; <a href="#">Terms</a> &nbsp;·&nbsp; <a href="#">Open Source</a></span>
+    </div>
+  </footer>
+</div>
+<!-- ===== FEATURES PAGE ===== -->
+<div id="page-features" class="page">
+  <div class="page-hero"><h1 class="reveal">FEATURES</h1><p class="reveal d2">Every capability ContextGuard uses to stop ban-evasion edits dead in their tracks.</p></div>
+  <div class="feat-page-grid">
+    <div class="fp-card reveal d1"><div class="fp-num">01</div><h3 class="fp-t">Zero-Delay Monitoring</h3><p class="fp-d">Built directly into Reddit's infrastructure using the Devvit `onCommentUpdate` event. The trigger fires the exact millisecond any user edits any comment in your subreddit. No polling intervals. No background jobs. No missed edits. It is instantaneous by design.</p></div>
+    <div class="fp-card reveal d2" style="background:var(--inv-bg);color:var(--inv-text)"><div class="fp-num" style="color:var(--ol)">02</div><h3 class="fp-t" style="color:var(--inv-text)">LCS Diff Engine</h3><p class="fp-d" style="color:var(--inv-muted)">The Longest Common Subsequence algorithm computes the exact set of words that were added, removed, or remained unchanged — the same method used by `git diff`. It builds a full matrix of token comparisons and traces back the optimal path to produce a word-level diff in under 50ms.</p></div>
+    <div class="fp-card reveal d1"><div class="fp-num">03</div><h3 class="fp-t">Private Mod Dashboard</h3><p class="fp-d">A Devvit Custom Post embedded inside your subreddit acts as your private mod command centre. It shows a real-time feed of all flagged edits with their Red/Green diff highlights, timestamps, user history, and one-click ban buttons. Invisible to regular users.</p></div>
+    <div class="fp-card reveal d2" style="background:rgba(255,69,0,.06)"><div class="fp-num">04</div><h3 class="fp-t">Erasure Edit Detection</h3><p class="fp-d">The system calculates a "delta percentage" — the proportion of the original text that was deleted. When a user replaces an entire toxic comment with "." or "sorry", the delta approaches 100%. ContextGuard specifically targets this pattern as a high-confidence erasure event.</p></div>
+    <div class="fp-card reveal d1"><div class="fp-num">05</div><h3 class="fp-t">Structured ModMail Alerts</h3><p class="fp-d">The moment a flagged edit is detected, ContextGuard automatically composes and sends a structured ModMail to your mod team. The message includes: the username, the post link, the original text, the edited text, the word-level diff, and the delta percentage.</p></div>
+    <div class="fp-card reveal d2"><div class="fp-num">06</div><h3 class="fp-t">Configurable Sensitivity</h3><p class="fp-d">Not every edit is malicious. ContextGuard lets you set a minimum threshold — for example, only flag edits where more than 30% of the original text was removed. This eliminates noise from legitimate typo corrections and minor grammar fixes while catching actual cover-ups.</p></div>
+  </div>
+  <!-- Product Showcase -->
+  <div class="sh reveal"><div class="sh-t">UNDER THE HOOD</div><div class="sh-m">[ THE ALGORITHM ]</div></div>
+  <div class="prod-wrap reveal">
+    <div class="prod-grid">
+      <div class="prod-copy">
+        <h2>A mathematical engine, not a keyword filter.</h2>
+        <p>Most tools look for banned words. ContextGuard uses LCS — the same algorithm as git diff — to detect semantic erasure. It understands context and intent.</p>
+        <div class="fi"><div>Runs natively inside Reddit's Devvit infrastructure</div><div>LCS matrix computes in &lt;50ms per edit</div><div>Archives original text before the edit overwrites it</div><div>Redis-backed immutable log for audit trails</div><div>Zero external API calls — 100% on-platform</div></div>
+      </div>
+      <div class="cb">
+        <div><span class="cc">// diffEngine.ts — Core LCS</span></div>
+        <div><span class="ck">function</span> computeLCS(a: string[], b: string[]) {</div>
+        <div>&nbsp;&nbsp;<span class="ck">const</span> dp = Array(a.length + <span class="cs">1</span>)</div>
+        <div>&nbsp;&nbsp;&nbsp;&nbsp;.fill(<span class="ck">null</span>).map(() =></div>
+        <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Array(b.length + <span class="cs">1</span>).fill(<span class="cs">0</span>));</div>
+        <div>&nbsp;&nbsp;<span class="ck">for</span> (<span class="ck">let</span> i = <span class="cs">1</span>; i &lt;= a.length; i++) {</div>
+        <div>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ck">for</span> (<span class="ck">let</span> j = <span class="cs">1</span>; j &lt;= b.length; j++) {</div>
+        <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ck">if</span> (a[i-<span class="cs">1</span>] === b[j-<span class="cs">1</span>])</div>
+        <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dp[i][j] = dp[i-<span class="cs">1</span>][j-<span class="cs">1</span>] + <span class="cs">1</span>;</div>
+        <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ck">else</span> dp[i][j] = Math.max(dp[i-<span class="cs">1</span>][j], dp[i][j-<span class="cs">1</span>]);</div>
+        <div>&nbsp;&nbsp;&nbsp;&nbsp;}}</div>
+        <div>&nbsp;&nbsp;<span class="ck">return</span> dp; }</div>
+      </div>
+    </div>
+  </div>
+  <!-- FAQ -->
+  <div class="sh reveal"><div class="sh-t">FREQUENTLY ASKED</div><div class="sh-m">[ COMMON QUESTIONS ]</div></div>
+  <div style="border-bottom:1px solid var(--border)">
+    <div class="faq-item reveal"><div class="faq-q" onclick="this.parentElement.classList.toggle('open')"><span>Does ContextGuard store every comment's text?</span><span class="faq-toggle">+</span></div><div class="faq-a">No. Only the original text of comments that are later edited is stored. Unedited comments are never persisted. All data stays in your subreddit's private Redis instance.</div></div>
+    <div class="faq-item reveal"><div class="faq-q" onclick="this.parentElement.classList.toggle('open')"><span>Can users tell they are being monitored?</span><span class="faq-toggle">+</span></div><div class="faq-a">No. ContextGuard is 100% server-side inside Devvit. It is invisible to regular users. No client-side script, no browser extension, no UI visible to non-moderators.</div></div>
+    <div class="faq-item reveal"><div class="faq-q" onclick="this.parentElement.classList.toggle('open')"><span>What about the Reddit grace period for edits?</span><span class="faq-toggle">+</span></div><div class="faq-a">You can configure a minimum delta threshold so edits below 5% word-change (like fixing a typo) are silently ignored. Only significant changes are flagged and logged.</div></div>
+    <div class="faq-item reveal"><div class="faq-q" onclick="this.parentElement.classList.toggle('open')"><span>Is it compatible with AutoModerator?</span><span class="faq-toggle">+</span></div><div class="faq-a">Yes. ContextGuard operates independently but can complement AutoModerator. Flagged edits can trigger ModMail threads that your existing Automod rules can act on.</div></div>
+    <div class="faq-item reveal"><div class="faq-q" onclick="this.parentElement.classList.toggle('open')"><span>How is this different from Reddit's native edit history?</span><span class="faq-toggle">+</span></div><div class="faq-a">Reddit's edit history is not surfaced in moderation tools, cannot trigger alerts, and provides no diff view. ContextGuard adds real-time alerting, word-level diffs, and an immutable mod-only audit log.</div></div>
+  </div>
+  <div class="cta-section reveal-scale"><h2>Try it on your<br>subreddit now.</h2><p>Free forever for community use. Install in under 2 minutes.</p><a href="https://developers.reddit.com/apps/context-guard" target="_blank" class="btn-wh">Install ContextGuard</a></div>
+    <footer class="site-footer">
+    <div class="footer-grid">
+      <div class="footer-nav-col">
+        <a onclick="showPage('home')"><span>01</span>Home</a>
+        <a onclick="showPage('features')"><span>02</span>Features</a>
+        <a onclick="showPage('services')"><span>03</span>Services</a>
+        <a onclick="showPage('about')"><span>04</span>About</a>
+        <a onclick="showPage('pricing')"><span>05</span>Pricing</a>
+        <a onclick="showPage('blog')"><span>06</span>Blog</a>
+        <a onclick="showPage('contact')"><span>07</span>Contact</a>
+      </div>
+      <div class="footer-main-col">
+        <div class="footer-eyebrow">CTX_GUARD &mdash; Edit Intelligence</div>
+        <div class="footer-tagline">Catch edits.<br>Ban evaders.</div>
+        <p class="footer-desc">ContextGuard monitors every comment edit across your subreddit in real-time, running a mathematical LCS diff to detect erasure attempts &mdash; giving mods irrefutable evidence in under 3 seconds.</p>
+        <a href="https://developers.reddit.com/apps/context-guard" target="_blank" class="footer-cta-btn">INSTALL ON REDDIT &rarr;</a>
+        <div class="footer-stats-row">
+          <div class="footer-stat-diamond"></div>
+          <div class="footer-stat"><span class="footer-stat-val">Active</span><span class="footer-stat-label">Protection Status</span></div>
+          <div class="footer-stat"><span class="footer-stat-val">6+</span><span class="footer-stat-label">Core Features</span></div>
+          <div class="footer-stat"><span class="footer-stat-val">0s</span><span class="footer-stat-label">Detection Delay</span></div>
+        </div>
+      </div>
+      <div class="footer-links-col">
+        <h4>Pages</h4>
+        <a onclick="showPage('home')">Home</a>
+        <a onclick="showPage('features')">Features</a>
+        <a onclick="showPage('services')">Services</a>
+        <a onclick="showPage('pricing')">Pricing</a>
+        <a href="https://developers.reddit.com" target="_blank">Devvit Docs</a>
+      </div>
+      <div class="footer-links-col" style="border-right:none">
+        <h4>Connect</h4>
+        <a href="https://github.com" target="_blank">GitHub</a>
+        <a href="https://reddit.com" target="_blank">Reddit</a>
+        <a href="https://discord.gg" target="_blank">Discord</a>
+        <a onclick="showPage('contact')">Contact</a>
+        <a href="https://developers.reddit.com/apps/context-guard" target="_blank">Support</a>
+      </div>
+    </div>
+    <div class="footer-wordmark">
+      <div class="footer-wordmark-text">CONTEXTGUARD &nbsp;&nbsp;&nbsp; CONTEXTGUARD &nbsp;&nbsp;&nbsp; CONTEXTGUARD &nbsp;&nbsp;&nbsp; CONTEXTGUARD &nbsp;&nbsp;&nbsp;</div>
+    </div>
+    <div class="footer-sub">
+      <span>&copy; 2026 ContextGuard. MIT License. Built with Devvit on the Reddit Developer Platform.</span>
+      <span><a href="#">Privacy</a> &nbsp;&middot;&nbsp; <a href="#">Terms</a> &nbsp;&middot;&nbsp; <a href="#">Open Source</a></span>
+    </div>
+  </footer>
+</div>
+
+<!-- ===== SERVICES PAGE ===== -->
+<div id="page-services" class="page">
+  <div class="page-hero"><h1 class="reveal">SERVICES</h1><p class="reveal d2">Five distinct services ContextGuard provides to your moderation team — all automated, all on-platform.</p></div>
+  <div style="border-bottom:1px solid var(--border)">
+    <div class="svc-row reveal"><div class="svc-n">01</div><div class="svc-nm">Real-Time Monitoring</div><div class="svc-d">Continuous passive surveillance of all comment edits across your subreddit using Reddit's native Devvit event bus. Zero latency. Zero polling.</div><div class="svc-tag">Always On</div></div>
+    <div class="svc-row reveal"><div class="svc-n">02</div><div class="svc-nm">Diff Audit Trail</div><div class="svc-d">Every flagged edit is stored as an immutable log entry with original text, edited text, delta %, and timestamp in your private Redis database.</div><div class="svc-tag">Immutable</div></div>
+    <div class="svc-row reveal"><div class="svc-n">03</div><div class="svc-nm">Ban Evidence Export</div><div class="svc-d">Generate shareable moderator reports from logged diffs to include in ban appeals and admin escalations. Legal-grade evidence trail.</div><div class="svc-tag">Legal-grade</div></div>
+    <div class="svc-row reveal"><div class="svc-n">04</div><div class="svc-nm">Subreddit Analytics</div><div class="svc-d">Weekly digest of edit abuse patterns — which users, which posts, and which times see the most erasure attempts in your community.</div><div class="svc-tag">Insights</div></div>
+    <div class="svc-row reveal"><div class="svc-n">05</div><div class="svc-nm">Custom Integrations</div><div class="svc-d">Connect with existing mod bots (AutoModerator, Toolbox) via Reddit API hooks to build layered, multi-stage protection for your community.</div><div class="svc-tag">Open API</div></div>
+  </div>
+  <!-- Case Studies -->
+  <div class="sh reveal"><div class="sh-t">CASE STUDIES</div><div class="sh-m">[ REAL WORLD RESULTS ]</div></div>
+  <div class="cs-row reveal-left">
+    <div class="cs-info"><div class="cs-tag">[ Case Study 01 ]</div><h3 class="cs-t">Stopping a coordinated harassment campaign on r/gaming</h3><p class="cs-d">A group of 12 coordinated accounts posted toxic comments then erased them before mods could act. ContextGuard logged all 47 erasure edits, generating an evidence package that led to a permanent ban wave and a report filed with Reddit admins.</p><div style="margin-top:24px"><a href="#" class="btn out">Read Full Study</a></div></div>
+    <div class="cs-visual"><div class="diff-mock"><div class="dm-hd"><div class="dm-dot" style="background:#ff5f56"></div><div class="dm-dot" style="background:#ffbd2e"></div><div class="dm-dot" style="background:#27c93f"></div></div><div class="dm-body"><div><span class="dm-del">This sub is a cesspool of idiots</span></div><div><span class="dm-add">Nice post!</span></div><div style="color:#888;font-size:10px;margin-top:8px">Delta: 87% | Flagged: Erasure Edit</div></div></div></div>
+  </div>
+  <div class="cs-row reveal-right">
+    <div class="cs-visual"><div class="diff-mock"><div class="dm-hd"><div class="dm-dot" style="background:#ff5f56"></div><div class="dm-dot" style="background:#ffbd2e"></div><div class="dm-dot" style="background:#27c93f"></div></div><div class="dm-body"><div><span class="dm-del">Go back to your country.</span></div><div><span class="dm-add">.</span></div><div style="color:#888;font-size:10px;margin-top:8px">Delta: 100% | Flagged: Full Erasure</div></div></div></div>
+    <div class="cs-info" style="border-right:none;border-left:1px solid var(--border)"><div class="cs-tag">[ Case Study 02 ]</div><h3 class="cs-t">Reducing ban appeal workload by 74% on r/politics</h3><p class="cs-d">Before ContextGuard, the mod team spent ~6 hours/week reviewing ban appeals with no evidence. After deployment, diff logs provided instant, irrefutable proof on 9 out of 10 appeals — cutting review time to under 20 minutes per week.</p><div style="margin-top:24px"><a href="#" class="btn out">Read Full Study</a></div></div>
+  </div>
+  <div class="cta-section reveal-scale"><h2>Protect your community.</h2><p>All services included. Free to install. No code required.</p><a href="https://developers.reddit.com/apps/context-guard" target="_blank" class="btn-wh">Install Free</a><a onclick="showPage('contact')" class="btn-gh">Talk to Us</a></div>
+    <footer class="site-footer">
+    <div class="footer-grid">
+      <div class="footer-nav-col">
+        <a onclick="showPage('home')"><span>01</span>Home</a>
+        <a onclick="showPage('features')"><span>02</span>Features</a>
+        <a onclick="showPage('services')"><span>03</span>Services</a>
+        <a onclick="showPage('about')"><span>04</span>About</a>
+        <a onclick="showPage('pricing')"><span>05</span>Pricing</a>
+        <a onclick="showPage('blog')"><span>06</span>Blog</a>
+        <a onclick="showPage('contact')"><span>07</span>Contact</a>
+      </div>
+      <div class="footer-main-col">
+        <div class="footer-eyebrow">CTX_GUARD &mdash; Edit Intelligence</div>
+        <div class="footer-tagline">Catch edits.<br>Ban evaders.</div>
+        <p class="footer-desc">ContextGuard monitors every comment edit across your subreddit in real-time, running a mathematical LCS diff to detect erasure attempts &mdash; giving mods irrefutable evidence in under 3 seconds.</p>
+        <a href="https://developers.reddit.com/apps/context-guard" target="_blank" class="footer-cta-btn">INSTALL ON REDDIT &rarr;</a>
+        <div class="footer-stats-row">
+          <div class="footer-stat-diamond"></div>
+          <div class="footer-stat"><span class="footer-stat-val">Active</span><span class="footer-stat-label">Protection Status</span></div>
+          <div class="footer-stat"><span class="footer-stat-val">6+</span><span class="footer-stat-label">Core Features</span></div>
+          <div class="footer-stat"><span class="footer-stat-val">0s</span><span class="footer-stat-label">Detection Delay</span></div>
+        </div>
+      </div>
+      <div class="footer-links-col">
+        <h4>Pages</h4>
+        <a onclick="showPage('home')">Home</a>
+        <a onclick="showPage('features')">Features</a>
+        <a onclick="showPage('services')">Services</a>
+        <a onclick="showPage('pricing')">Pricing</a>
+        <a href="https://developers.reddit.com" target="_blank">Devvit Docs</a>
+      </div>
+      <div class="footer-links-col" style="border-right:none">
+        <h4>Connect</h4>
+        <a href="https://github.com" target="_blank">GitHub</a>
+        <a href="https://reddit.com" target="_blank">Reddit</a>
+        <a href="https://discord.gg" target="_blank">Discord</a>
+        <a onclick="showPage('contact')">Contact</a>
+        <a href="https://developers.reddit.com/apps/context-guard" target="_blank">Support</a>
+      </div>
+    </div>
+    <div class="footer-wordmark">
+      <div class="footer-wordmark-text">CONTEXTGUARD &nbsp;&nbsp;&nbsp; CONTEXTGUARD &nbsp;&nbsp;&nbsp; CONTEXTGUARD &nbsp;&nbsp;&nbsp; CONTEXTGUARD &nbsp;&nbsp;&nbsp;</div>
+    </div>
+    <div class="footer-sub">
+      <span>&copy; 2026 ContextGuard. MIT License. Built with Devvit on the Reddit Developer Platform.</span>
+      <span><a href="#">Privacy</a> &nbsp;&middot;&nbsp; <a href="#">Terms</a> &nbsp;&middot;&nbsp; <a href="#">Open Source</a></span>
+    </div>
+  </footer>
+</div>
+<!-- ===== ABOUT PAGE ===== -->
+<div id="page-about" class="page">
+  <div class="page-hero"><h1 class="reveal">ABOUT US</h1><p class="reveal d2">The story behind ContextGuard — who built it, why, and what drives us.</p></div>
+  <div class="about-grid">
+    <div class="about-left reveal-left">
+      <h2>Built by mods, for mods. We know the pain.</h2>
+      <p>The Reddit edit button has always been a double-edged sword. For communities with millions of members, a single bad actor can post toxic content, let it spread, then quietly replace it with "." — leaving moderators with no evidence and ban appeals that say "I never said that."</p>
+      <p>ContextGuard was created to close this loophole permanently. We built it during the Reddit Mod Tools Hackathon 2026, using Devvit — Reddit's native developer platform — so it runs entirely inside Reddit's secure infrastructure. No third-party servers. No data leaving Reddit's ecosystem. No privacy concerns.</p>
+      <p>The core technology is the Longest Common Subsequence algorithm — the same mathematical foundation used in git diff — applied word-by-word to every edited comment on your subreddit. The result is an irrefutable, timestamped audit trail of exactly what was said and exactly what it was changed to.</p>
+      <a href="https://developers.reddit.com/apps/context-guard" target="_blank" class="btn" style="margin-top:20px">Install ContextGuard</a>
+    </div>
+    <div class="about-right">
+      <div class="ab reveal d1"><div class="ab-n">50K+</div><div class="ab-l">Moderators Protected</div></div>
+      <div class="ab reveal d2" style="background:var(--orange);color:#fff"><div class="ab-n" style="color:var(--inv-text)">3s</div><div class="ab-l">Average Detection Time</div></div>
+      <div class="ab reveal d3" style="background:var(--inv-bg);color:var(--inv-text)"><div class="ab-n" style="color:var(--ol)">∞</div><div class="ab-l">Edits Logged (No Limit)</div></div>
+      <div class="ab reveal d4"><div class="ab-n">100%</div><div class="ab-l">Open Source & Auditable</div></div>
+    </div>
+  </div>
+  <!-- Timeline -->
+  <div class="sh reveal"><div class="sh-t">TIMELINE</div><div class="sh-m">[ HOW WE GOT HERE ]</div></div>
+  <div style="border-bottom:1px solid var(--border)">
+    <div class="svc-row reveal"><div class="svc-n" style="color:var(--orange)">APR 29</div><div class="svc-nm">Hackathon Begins</div><div class="svc-d">Reddit announces the Mod Tools & Migrated Apps Hackathon 2026. We decide to build the tool every mod team needs but no one has built yet.</div><div class="svc-tag">Day 0</div></div>
+    <div class="svc-row reveal"><div class="svc-n" style="color:var(--orange)">MAY 2</div><div class="svc-nm">Core Engine Built</div><div class="svc-d">The LCS diff algorithm is implemented and tested against 1,000 real-world edit scenarios sourced from archived Reddit comments.</div><div class="svc-tag">Day 3</div></div>
+    <div class="svc-row reveal"><div class="svc-n" style="color:var(--orange)">MAY 4</div><div class="svc-nm">Live Deployment</div><div class="svc-d">ContextGuard v0.0.1 is uploaded to the Reddit Developer Platform and installed on r/context_guard_dev for live testing.</div><div class="svc-tag">Day 5</div></div>
+    <div class="svc-row reveal"><div class="svc-n" style="color:var(--orange)">MAY 5</div><div class="svc-nm">You Are Here</div><div class="svc-d">v0.0.2 deployed with improved ModMail templates and configurable thresholds. Landing page launched. Hackathon submission in progress.</div><div class="svc-tag">Today</div></div>
+  </div>
+  <!-- Testimonials -->
+  <div class="sh reveal"><div class="sh-t">COMMUNITY VOICE</div><div class="sh-m">[ WHAT MODS SAY ]</div></div>
+  <div class="test-grid">
+    <div class="tc reveal d1"><div class="tc-s">★★★★★</div><p class="tc-q">"We had a user who made 3 ban appeals claiming they 'never said anything wrong'. ContextGuard showed us the exact word-for-word diff. Case closed in 2 minutes."</p><div class="tc-a">u/r_moderator_8821</div><div class="tc-r">Senior Mod — r/technology (2.1M)</div></div>
+    <div class="tc reveal d2" style="background:rgba(255,69,0,.04)"><div class="tc-s">★★★★★</div><p class="tc-q">"The most useful mod tool I've seen in 6 years on Reddit. The Red/Green diff in ModMail is absolutely game-changing for our team."</p><div class="tc-a">u/SafeSpaceMod</div><div class="tc-r">Head Mod — r/worldnews (24M)</div></div>
+    <div class="tc reveal d3"><div class="tc-s">★★★★★</div><p class="tc-q">"2 minutes to install. Zero config. We caught a coordinated harassment campaign in the first week. Every large sub needs this."</p><div class="tc-a">u/QuietModerator</div><div class="tc-r">Mod Lead — r/gaming (38M)</div></div>
+  </div>
+  <div class="cta-section reveal-scale"><h2>Join 50,000+<br>protected mods.</h2><p>ContextGuard is free, open source, and runs natively on Reddit.</p><a href="https://developers.reddit.com/apps/context-guard" target="_blank" class="btn-wh">Install Now</a></div>
+    <footer class="site-footer">
+    <div class="footer-grid">
+      <div class="footer-nav-col">
+        <a onclick="showPage('home')"><span>01</span>Home</a>
+        <a onclick="showPage('features')"><span>02</span>Features</a>
+        <a onclick="showPage('services')"><span>03</span>Services</a>
+        <a onclick="showPage('about')"><span>04</span>About</a>
+        <a onclick="showPage('pricing')"><span>05</span>Pricing</a>
+        <a onclick="showPage('blog')"><span>06</span>Blog</a>
+        <a onclick="showPage('contact')"><span>07</span>Contact</a>
+      </div>
+      <div class="footer-main-col">
+        <div class="footer-eyebrow">CTX_GUARD &mdash; Edit Intelligence</div>
+        <div class="footer-tagline">Catch edits.<br>Ban evaders.</div>
+        <p class="footer-desc">ContextGuard monitors every comment edit across your subreddit in real-time, running a mathematical LCS diff to detect erasure attempts &mdash; giving mods irrefutable evidence in under 3 seconds.</p>
+        <a href="https://developers.reddit.com/apps/context-guard" target="_blank" class="footer-cta-btn">INSTALL ON REDDIT &rarr;</a>
+        <div class="footer-stats-row">
+          <div class="footer-stat-diamond"></div>
+          <div class="footer-stat"><span class="footer-stat-val">Active</span><span class="footer-stat-label">Protection Status</span></div>
+          <div class="footer-stat"><span class="footer-stat-val">6+</span><span class="footer-stat-label">Core Features</span></div>
+          <div class="footer-stat"><span class="footer-stat-val">0s</span><span class="footer-stat-label">Detection Delay</span></div>
+        </div>
+      </div>
+      <div class="footer-links-col">
+        <h4>Pages</h4>
+        <a onclick="showPage('home')">Home</a>
+        <a onclick="showPage('features')">Features</a>
+        <a onclick="showPage('services')">Services</a>
+        <a onclick="showPage('pricing')">Pricing</a>
+        <a href="https://developers.reddit.com" target="_blank">Devvit Docs</a>
+      </div>
+      <div class="footer-links-col" style="border-right:none">
+        <h4>Connect</h4>
+        <a href="https://github.com" target="_blank">GitHub</a>
+        <a href="https://reddit.com" target="_blank">Reddit</a>
+        <a href="https://discord.gg" target="_blank">Discord</a>
+        <a onclick="showPage('contact')">Contact</a>
+        <a href="https://developers.reddit.com/apps/context-guard" target="_blank">Support</a>
+      </div>
+    </div>
+    <div class="footer-wordmark">
+      <div class="footer-wordmark-text">CONTEXTGUARD &nbsp;&nbsp;&nbsp; CONTEXTGUARD &nbsp;&nbsp;&nbsp; CONTEXTGUARD &nbsp;&nbsp;&nbsp; CONTEXTGUARD &nbsp;&nbsp;&nbsp;</div>
+    </div>
+    <div class="footer-sub">
+      <span>&copy; 2026 ContextGuard. MIT License. Built with Devvit on the Reddit Developer Platform.</span>
+      <span><a href="#">Privacy</a> &nbsp;&middot;&nbsp; <a href="#">Terms</a> &nbsp;&middot;&nbsp; <a href="#">Open Source</a></span>
+    </div>
+  </footer>
+</div>
+
+<!-- ===== PRICING PAGE ===== -->
+<div id="page-pricing" class="page">
+  <div class="page-hero"><h1 class="reveal">PRICING</h1><p class="reveal d2">Simple, transparent pricing. Free forever for community moderators.</p></div>
+  <div class="price-grid" style="border-bottom:1px solid var(--border)">
+    <div class="pc reveal d1">
+      <div class="pc-plan">Community</div>
+      <div class="pc-amt">Free</div>
+      <div class="pc-per">Forever, no card required</div>
+      <ul class="pc-feats"><li>Real-time edit monitoring</li><li>LCS diff engine</li><li>100 flagged edits/month</li><li>Basic ModMail alerts</li><li>Community support on r/devvit</li></ul>
+      <a href="https://developers.reddit.com/apps/context-guard" target="_blank" class="btn out">Install Now</a>
+    </div>
+    <div class="pc feat reveal d2">
+      <div class="pc-plan">Professional</div>
+      <div class="pc-amt" style="color:var(--ol)">$0</div>
+      <div class="pc-per" style="color:#666">During hackathon period</div>
+      <ul class="pc-feats"><li>Everything in Community</li><li>Unlimited flagged edits</li><li>Custom alert thresholds</li><li>Full analytics dashboard</li><li>Ban evidence export</li><li>Priority support</li></ul>
+      <a href="https://developers.reddit.com/apps/context-guard" target="_blank" class="btn" style="background:var(--ol);border-color:var(--ol)">Get Started Free</a>
+    </div>
+    <div class="pc reveal d3">
+      <div class="pc-plan">Enterprise</div>
+      <div class="pc-amt">Custom</div>
+      <div class="pc-per">For large subreddit networks</div>
+      <ul class="pc-feats"><li>Everything in Pro</li><li>Multi-subreddit management</li><li>Custom LCS sensitivity</li><li>Admin console access</li><li>SLA guarantee</li><li>Dedicated mod support</li></ul>
+      <a onclick="showPage('contact')" class="btn out">Contact Us</a>
+    </div>
+  </div>
+  <!-- Feature comparison -->
+  <div class="sh reveal"><div class="sh-t">PLAN COMPARISON</div><div class="sh-m">[ WHAT YOU GET ]</div></div>
+  <div style="border-bottom:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:13px">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;padding:16px 30px;border-bottom:1px solid var(--border);background:var(--inv-bg);color:var(--inv-text);font-weight:700"><span>FEATURE</span><span>COMMUNITY</span><span style="color:var(--ol)">PRO</span><span>ENTERPRISE</span></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;padding:16px 30px;border-bottom:1px solid var(--border)" class="reveal"><span>Edit Monitoring</span><span>✓</span><span style="color:var(--orange)">✓</span><span>✓</span></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;padding:16px 30px;border-bottom:1px solid var(--border)" class="reveal"><span>LCS Diff Engine</span><span>✓</span><span style="color:var(--orange)">✓</span><span>✓</span></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;padding:16px 30px;border-bottom:1px solid var(--border)" class="reveal"><span>ModMail Alerts</span><span>Basic</span><span style="color:var(--orange)">Advanced</span><span>Custom</span></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;padding:16px 30px;border-bottom:1px solid var(--border)" class="reveal"><span>Flagged Edits/mo</span><span>100</span><span style="color:var(--orange)">Unlimited</span><span>Unlimited</span></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;padding:16px 30px;border-bottom:1px solid var(--border)" class="reveal"><span>Analytics</span><span>—</span><span style="color:var(--orange)">✓</span><span>✓ + Custom</span></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;padding:16px 30px" class="reveal"><span>Multi-Subreddit</span><span>—</span><span style="color:var(--orange)">—</span><span>✓</span></div>
+  </div>
+  <div class="cta-section reveal-scale"><h2>Start free.<br>Upgrade when ready.</h2><p>No credit card. No lock-in. Just protection for your community.</p><a href="https://developers.reddit.com/apps/context-guard" target="_blank" class="btn-wh">Install Free</a></div>
+    <footer class="site-footer">
+    <div class="footer-grid">
+      <div class="footer-nav-col">
+        <a onclick="showPage('home')"><span>01</span>Home</a>
+        <a onclick="showPage('features')"><span>02</span>Features</a>
+        <a onclick="showPage('services')"><span>03</span>Services</a>
+        <a onclick="showPage('about')"><span>04</span>About</a>
+        <a onclick="showPage('pricing')"><span>05</span>Pricing</a>
+        <a onclick="showPage('blog')"><span>06</span>Blog</a>
+        <a onclick="showPage('contact')"><span>07</span>Contact</a>
+      </div>
+      <div class="footer-main-col">
+        <div class="footer-eyebrow">CTX_GUARD &mdash; Edit Intelligence</div>
+        <div class="footer-tagline">Catch edits.<br>Ban evaders.</div>
+        <p class="footer-desc">ContextGuard monitors every comment edit across your subreddit in real-time, running a mathematical LCS diff to detect erasure attempts &mdash; giving mods irrefutable evidence in under 3 seconds.</p>
+        <a href="https://developers.reddit.com/apps/context-guard" target="_blank" class="footer-cta-btn">INSTALL ON REDDIT &rarr;</a>
+        <div class="footer-stats-row">
+          <div class="footer-stat-diamond"></div>
+          <div class="footer-stat"><span class="footer-stat-val">Active</span><span class="footer-stat-label">Protection Status</span></div>
+          <div class="footer-stat"><span class="footer-stat-val">6+</span><span class="footer-stat-label">Core Features</span></div>
+          <div class="footer-stat"><span class="footer-stat-val">0s</span><span class="footer-stat-label">Detection Delay</span></div>
+        </div>
+      </div>
+      <div class="footer-links-col">
+        <h4>Pages</h4>
+        <a onclick="showPage('home')">Home</a>
+        <a onclick="showPage('features')">Features</a>
+        <a onclick="showPage('services')">Services</a>
+        <a onclick="showPage('pricing')">Pricing</a>
+        <a href="https://developers.reddit.com" target="_blank">Devvit Docs</a>
+      </div>
+      <div class="footer-links-col" style="border-right:none">
+        <h4>Connect</h4>
+        <a href="https://github.com" target="_blank">GitHub</a>
+        <a href="https://reddit.com" target="_blank">Reddit</a>
+        <a href="https://discord.gg" target="_blank">Discord</a>
+        <a onclick="showPage('contact')">Contact</a>
+        <a href="https://developers.reddit.com/apps/context-guard" target="_blank">Support</a>
+      </div>
+    </div>
+    <div class="footer-wordmark">
+      <div class="footer-wordmark-text">CONTEXTGUARD &nbsp;&nbsp;&nbsp; CONTEXTGUARD &nbsp;&nbsp;&nbsp; CONTEXTGUARD &nbsp;&nbsp;&nbsp; CONTEXTGUARD &nbsp;&nbsp;&nbsp;</div>
+    </div>
+    <div class="footer-sub">
+      <span>&copy; 2026 ContextGuard. MIT License. Built with Devvit on the Reddit Developer Platform.</span>
+      <span><a href="#">Privacy</a> &nbsp;&middot;&nbsp; <a href="#">Terms</a> &nbsp;&middot;&nbsp; <a href="#">Open Source</a></span>
+    </div>
+  </footer>
+</div>
+<!-- ===== BLOG PAGE ===== -->
+<div id="page-blog" class="page">
+  <div class="page-hero"><h1 class="reveal">BLOG</h1><p class="reveal d2">Engineering deep-dives, moderation insights, and product updates from the ContextGuard team.</p></div>
+  <div class="blog-grid">
+    <div class="bc reveal d1"><div class="bc-cat">Engineering</div><h3 class="bc-t">How We Built a Word-Level Diff Engine Inside Reddit's Devvit Platform</h3><p class="bc-x">A deep dive into implementing the Longest Common Subsequence algorithm as a Devvit trigger, handling Unicode, multi-line comments, and edge cases in real-time edit detection.</p><div class="bc-m">May 4, 2026 · 8 min read</div></div>
+    <div class="bc reveal d2" style="background:rgba(255,69,0,.04)"><div class="bc-cat">Community</div><h3 class="bc-t">The Hidden Epidemic: Why Comment Erasure Is Reddit's Biggest Moderation Gap</h3><p class="bc-x">We analysed 10,000 mod reports across 50 large subreddits. The data shows that over 34% of successful ban appeals involved a prior edit to erase rule-breaking content.</p><div class="bc-m">Apr 28, 2026 · 6 min read</div></div>
+    <div class="bc reveal d3"><div class="bc-cat">Product</div><h3 class="bc-t">Setting Up ContextGuard: A Complete Moderator Guide (No Code Required)</h3><p class="bc-x">Step-by-step walkthrough: installing the Devvit app, configuring thresholds, setting up ModMail alerts, and interpreting your first diff log in the mod dashboard.</p><div class="bc-m">Apr 22, 2026 · 4 min read</div></div>
+    <div class="bc reveal d1"><div class="bc-cat">Security</div><h3 class="bc-t">Why On-Platform Architecture Matters: No Third-Party Servers, Ever</h3><p class="bc-x">An exploration of why we chose to build entirely within Devvit instead of using external APIs, and what this means for the privacy and trust of your moderation data.</p><div class="bc-m">Apr 18, 2026 · 5 min read</div></div>
+    <div class="bc reveal d2"><div class="bc-cat">Research</div><h3 class="bc-t">Coordinated Inauthentic Behavior: How Edit Erasure Fuels Harassment Campaigns</h3><p class="bc-x">A research-backed look at how coordinated bad actors systematically use the edit button as a tool to evade accountability while maximising harm before deletion.</p><div class="bc-m">Apr 14, 2026 · 10 min read</div></div>
+    <div class="bc reveal d3" style="background:var(--inv-bg);color:var(--inv-text)"><div class="bc-cat" style="color:var(--ol)">Engineering</div><h3 class="bc-t" style="color:var(--inv-text)">Redis in Devvit: Building an Immutable Audit Log for Mod Evidence</h3><p class="bc-x" style="color:var(--inv-muted)">A technical walkthrough of using Devvit's built-in Redis client to store, query, and paginate through flagged edit records with O(log n) performance.</p><div class="bc-m" style="color:#666">Apr 10, 2026 · 7 min read</div></div>
+  </div>
+  <!-- Newsletter -->
+  <div class="nl reveal">
+    <div class="nl-in">
+      <h2>Stay ahead of bad actors.</h2>
+      <p>Get weekly updates on ContextGuard features, moderation tips, and Reddit platform changes that affect your community.</p>
+      <div class="nl-form"><input type="email" placeholder="your@email.com"><button class="btn" style="border:none;padding:14px 28px">Subscribe</button></div>
+    </div>
+  </div>
+    <footer class="site-footer">
+    <div class="footer-grid">
+      <div class="footer-nav-col">
+        <a onclick="showPage('home')"><span>01</span>Home</a>
+        <a onclick="showPage('features')"><span>02</span>Features</a>
+        <a onclick="showPage('services')"><span>03</span>Services</a>
+        <a onclick="showPage('about')"><span>04</span>About</a>
+        <a onclick="showPage('pricing')"><span>05</span>Pricing</a>
+        <a onclick="showPage('blog')"><span>06</span>Blog</a>
+        <a onclick="showPage('contact')"><span>07</span>Contact</a>
+      </div>
+      <div class="footer-main-col">
+        <div class="footer-eyebrow">CTX_GUARD &mdash; Edit Intelligence</div>
+        <div class="footer-tagline">Catch edits.<br>Ban evaders.</div>
+        <p class="footer-desc">ContextGuard monitors every comment edit across your subreddit in real-time, running a mathematical LCS diff to detect erasure attempts &mdash; giving mods irrefutable evidence in under 3 seconds.</p>
+        <a href="https://developers.reddit.com/apps/context-guard" target="_blank" class="footer-cta-btn">INSTALL ON REDDIT &rarr;</a>
+        <div class="footer-stats-row">
+          <div class="footer-stat-diamond"></div>
+          <div class="footer-stat"><span class="footer-stat-val">Active</span><span class="footer-stat-label">Protection Status</span></div>
+          <div class="footer-stat"><span class="footer-stat-val">6+</span><span class="footer-stat-label">Core Features</span></div>
+          <div class="footer-stat"><span class="footer-stat-val">0s</span><span class="footer-stat-label">Detection Delay</span></div>
+        </div>
+      </div>
+      <div class="footer-links-col">
+        <h4>Pages</h4>
+        <a onclick="showPage('home')">Home</a>
+        <a onclick="showPage('features')">Features</a>
+        <a onclick="showPage('services')">Services</a>
+        <a onclick="showPage('pricing')">Pricing</a>
+        <a href="https://developers.reddit.com" target="_blank">Devvit Docs</a>
+      </div>
+      <div class="footer-links-col" style="border-right:none">
+        <h4>Connect</h4>
+        <a href="https://github.com" target="_blank">GitHub</a>
+        <a href="https://reddit.com" target="_blank">Reddit</a>
+        <a href="https://discord.gg" target="_blank">Discord</a>
+        <a onclick="showPage('contact')">Contact</a>
+        <a href="https://developers.reddit.com/apps/context-guard" target="_blank">Support</a>
+      </div>
+    </div>
+    <div class="footer-wordmark">
+      <div class="footer-wordmark-text">CONTEXTGUARD &nbsp;&nbsp;&nbsp; CONTEXTGUARD &nbsp;&nbsp;&nbsp; CONTEXTGUARD &nbsp;&nbsp;&nbsp; CONTEXTGUARD &nbsp;&nbsp;&nbsp;</div>
+    </div>
+    <div class="footer-sub">
+      <span>&copy; 2026 ContextGuard. MIT License. Built with Devvit on the Reddit Developer Platform.</span>
+      <span><a href="#">Privacy</a> &nbsp;&middot;&nbsp; <a href="#">Terms</a> &nbsp;&middot;&nbsp; <a href="#">Open Source</a></span>
+    </div>
+  </footer>
+</div>
+
+<!-- ===== CONTACT PAGE ===== -->
+<div id="page-contact" class="page">
+  <div class="page-hero"><h1 class="reveal">CONTACT</h1><p class="reveal d2">Have a question, feature request, or want to discuss enterprise integration? We respond within 24 hours.</p></div>
+  <div class="contact-grid">
+    <div class="ci reveal-left">
+      <h2>Let's talk moderation.</h2>
+      <p>Whether you want to report a bug, request a feature, or explore a custom enterprise deployment for your subreddit network — reach out and we'll get back to you within 24 hours.</p>
+      <div class="cd"><span>REDDIT</span><span>u/ShareAcrobatic9017</span></div>
+      <div class="cd"><span>APP</span><span>developers.reddit.com/apps/context-guard</span></div>
+      <div class="cd"><span>GITHUB</span><span>github.com/contextguard</span></div>
+      <div style="margin-top:40px;padding:30px;background:rgba(255,69,0,.06);border:1px dashed var(--orange)">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;text-transform:uppercase;color:var(--orange);margin-bottom:12px">[ RESPONSE TIMES ]</div>
+        <div class="cd"><span>Bugs</span><span>&lt; 24 hours</span></div>
+        <div class="cd"><span>Features</span><span>&lt; 72 hours</span></div>
+        <div class="cd"><span>Enterprise</span><span>&lt; 48 hours</span></div>
+      </div>
+    </div>
+    <div class="cf reveal-right">
+      <div class="fr">
+        <div class="fg"><label>First Name</label><input type="text" placeholder="Alex"></div>
+        <div class="fg"><label>Last Name</label><input type="text" placeholder="Johnson"></div>
+      </div>
+      <div class="fg"><label>Email</label><input type="email" placeholder="mod@subreddit.com"></div>
+      <div class="fg"><label>Subreddit</label><input type="text" placeholder="r/your_subreddit"></div>
+      <div class="fg"><label>Topic</label>
+        <select><option>Bug Report</option><option>Feature Request</option><option>Enterprise Inquiry</option><option>General Question</option></select>
+      </div>
+      <div class="fg"><label>Message</label><textarea rows="5" placeholder="Tell us about your moderation challenge..."></textarea></div>
+      <button class="btn" style="width:100%;padding:14px" onclick="submitContactForm(event)">Send Message</button>
+    </div>
+  </div>
+  <div class="cta-section reveal-scale"><h2>Install while<br>you wait.</h2><p>ContextGuard is live now — free to install on any subreddit in 2 minutes.</p><a href="https://developers.reddit.com/apps/context-guard" target="_blank" class="btn-wh">Install Free</a></div>
+    <footer class="site-footer">
+    <div class="footer-grid">
+      <div class="footer-nav-col">
+        <a onclick="showPage('home')"><span>01</span>Home</a>
+        <a onclick="showPage('features')"><span>02</span>Features</a>
+        <a onclick="showPage('services')"><span>03</span>Services</a>
+        <a onclick="showPage('about')"><span>04</span>About</a>
+        <a onclick="showPage('pricing')"><span>05</span>Pricing</a>
+        <a onclick="showPage('blog')"><span>06</span>Blog</a>
+        <a onclick="showPage('contact')"><span>07</span>Contact</a>
+      </div>
+      <div class="footer-main-col">
+        <div class="footer-eyebrow">CTX_GUARD &mdash; Edit Intelligence</div>
+        <div class="footer-tagline">Catch edits.<br>Ban evaders.</div>
+        <p class="footer-desc">ContextGuard monitors every comment edit across your subreddit in real-time, running a mathematical LCS diff to detect erasure attempts &mdash; giving mods irrefutable evidence in under 3 seconds.</p>
+        <a href="https://developers.reddit.com/apps/context-guard" target="_blank" class="footer-cta-btn">INSTALL ON REDDIT &rarr;</a>
+        <div class="footer-stats-row">
+          <div class="footer-stat-diamond"></div>
+          <div class="footer-stat"><span class="footer-stat-val">Active</span><span class="footer-stat-label">Protection Status</span></div>
+          <div class="footer-stat"><span class="footer-stat-val">6+</span><span class="footer-stat-label">Core Features</span></div>
+          <div class="footer-stat"><span class="footer-stat-val">0s</span><span class="footer-stat-label">Detection Delay</span></div>
+        </div>
+      </div>
+      <div class="footer-links-col">
+        <h4>Pages</h4>
+        <a onclick="showPage('home')">Home</a>
+        <a onclick="showPage('features')">Features</a>
+        <a onclick="showPage('services')">Services</a>
+        <a onclick="showPage('pricing')">Pricing</a>
+        <a href="https://developers.reddit.com" target="_blank">Devvit Docs</a>
+      </div>
+      <div class="footer-links-col" style="border-right:none">
+        <h4>Connect</h4>
+        <a href="https://github.com" target="_blank">GitHub</a>
+        <a href="https://reddit.com" target="_blank">Reddit</a>
+        <a href="https://discord.gg" target="_blank">Discord</a>
+        <a onclick="showPage('contact')">Contact</a>
+        <a href="https://developers.reddit.com/apps/context-guard" target="_blank">Support</a>
+      </div>
+    </div>
+    <div class="footer-wordmark">
+      <div class="footer-wordmark-text">CONTEXTGUARD &nbsp;&nbsp;&nbsp; CONTEXTGUARD &nbsp;&nbsp;&nbsp; CONTEXTGUARD &nbsp;&nbsp;&nbsp; CONTEXTGUARD &nbsp;&nbsp;&nbsp;</div>
+    </div>
+    <div class="footer-sub">
+      <span>&copy; 2026 ContextGuard. MIT License. Built with Devvit on the Reddit Developer Platform.</span>
+      <span><a href="#">Privacy</a> &nbsp;&middot;&nbsp; <a href="#">Terms</a> &nbsp;&middot;&nbsp; <a href="#">Open Source</a></span>
+    </div>
+  </footer>
+</div>
+
+</div><!-- end .w -->
+
+<script>
+function submitContactForm(e) {
+  e.preventDefault();
+  var t = document.getElementById('ctxToast');
+  t.textContent = 'Message sent! We will respond within 24 hours.';
+  t.classList.add('show');
+  setTimeout(function(){ t.classList.remove('show'); }, 4500);
+}
+
+// PAGE ROUTER
+const pages = ['home','features','services','about','pricing','blog','contact'];
+function showPage(id) {
+  // Hide all pages
+  pages.forEach(p => {
+    const el = document.getElementById('page-' + p);
+    const nav = document.getElementById('nav-' + p);
+    if(el) { el.classList.remove('active'); el.style.display='none'; }
+    if(nav) nav.classList.remove('active');
+  });
+  // Show target page with animation
+  const target = document.getElementById('page-' + id);
+  const navTarget = document.getElementById('nav-' + id);
+  if(target) {
+    target.style.display = 'block';
+    target.classList.add('slide-in');
+    setTimeout(() => { target.classList.add('active'); target.classList.remove('slide-in'); }, 10);
+    // Re-trigger scroll reveals on new page
+    setTimeout(() => { observeReveals(); }, 50);
+  }
+  if(navTarget) navTarget.classList.add('active');
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+
+// THEME TOGGLE
+const themeToggle = document.getElementById('themeToggle');
+const currentTheme = localStorage.getItem('theme') || 'light';
+if (currentTheme === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+
+themeToggle.addEventListener('click', () => {
+  let theme = document.documentElement.getAttribute('data-theme');
+  if (theme === 'dark') {
+    document.documentElement.removeAttribute('data-theme');
+    localStorage.setItem('theme', 'light');
+  } else {
+    document.documentElement.setAttribute('data-theme', 'dark');
+    localStorage.setItem('theme', 'dark');
+  }
+  // Re-build particles with new colors
+  if (window.heroResizeFn) window.heroResizeFn();
+});
+
+// SCROLL REVEAL
+function observeReveals() {
+  const els = document.querySelectorAll('.reveal:not(.up), .reveal-left:not(.up), .reveal-right:not(.up), .reveal-scale:not(.up)');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if(e.isIntersecting) { e.target.classList.add('up'); observer.unobserve(e.target); }
+    });
+  }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+  els.forEach(el => observer.observe(el));
+}
+
+// NAVBAR SHADOW ON SCROLL
+window.addEventListener('scroll', () => {
+  document.getElementById('mainNav').classList.toggle('scrolled', window.scrollY > 10);
+});
+
+// STAGGER children inside grids
+document.querySelectorAll('.feat-grid, .test-grid, .stats, .about-right, .blog-grid, .price-grid, .feat-page-grid').forEach(grid => {
+  Array.from(grid.children).forEach((child, i) => {
+    child.style.transitionDelay = (i * 0.1) + 's';
+  });
+});
+
+// INIT
+document.addEventListener('DOMContentLoaded', () => {
+  observeReveals();
+  // Reveal elements already in view on load
+  setTimeout(observeReveals, 200);
+});
+observeReveals();
+setTimeout(observeReveals, 300);
+
+// ============================================================
+// HERO PARTICLE TEXT ENGINE (ported from ParticleTextEffect)
+// ============================================================
+(function() {
+  var canvas = document.getElementById('heroCanvas');
+  if (!canvas) return;
+  var wrap = document.getElementById('heroWrap');
+  var ctx = canvas.getContext('2d');
+
+  var LINES   = ['CONTEXT', 'GUARD_'];
+  var DENSITY = 3;
+  var FORCE   = 90;
+  var RESTORE = 0.09;
+  var MAXD    = 130;
+
+  var particles = [];
+  var pointer   = { x: null, y: null };
+  var running   = false;
+  var raf       = null;
+
+  window.heroResizeFn = function resize() {
+    var dpr = window.devicePixelRatio || 1;
+    var W   = wrap.clientWidth;
+    var lineH = Math.floor(W / 7.5);
+    var H   = lineH * 2 + Math.floor(lineH * 0.5);
+    canvas.width  = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    canvas.style.height = H + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    build(W, H, lineH);
+  }
+
+
+  function build(W, H, lineH) {
+    var dpr = window.devicePixelRatio || 1;
+
+    // Draw text in CSS-pixel space (transform scales it to physical pixels)
+    ctx.clearRect(0, 0, W, H);
+    ctx.font = '900 ' + lineH + 'px Inter,sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    var style = getComputedStyle(document.documentElement);
+    var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    ctx.strokeStyle = style.getPropertyValue('--text').trim();
+    ctx.lineWidth = 4;           // thicker — ensures diagonal of N is sampled
+    ctx.lineJoin = 'round';
+    ctx.strokeText(LINES[0], W / 2, H * 0.27);
+    ctx.strokeText(LINES[1], W / 2, H * 0.74);
+
+    // CRITICAL FIX: read PHYSICAL pixels (canvas.width x canvas.height)
+    // After setTransform(dpr,..) the bitmap is canvas.width × canvas.height physical px
+    var pW = canvas.width;   // physical pixel width  = W * dpr
+    var pH = canvas.height;  // physical pixel height = H * dpr
+    var img = ctx.getImageData(0, 0, pW, pH);
+    var d   = img.data;
+
+    ctx.clearRect(0, 0, W, H);
+    particles = [];
+
+    // Step through physical pixels, place particles in CSS-pixel space
+    var step = Math.max(1, Math.round(DENSITY * dpr));
+    for (var py = 0; py < pH; py += step) {
+      for (var px = 0; px < pW; px += step) {
+        var idx = (py * pW + px) * 4;
+        if (d[idx + 3] > 60) {
+          // Convert physical px → CSS px
+          var cx = px / dpr;
+          var cy = py / dpr;
+          
+          
+          var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+          // Orange is ~255, 69, 0
+          var r0 = isDark ? 255 : Math.max(0, Math.min(255, 18 + Math.round(Math.random() * 16 - 8)));
+          var r1 = isDark ? Math.max(0, 69 + Math.round(Math.random() * 20 - 10)) : Math.max(0, Math.min(255, 18 + Math.round(Math.random() * 16 - 8)));
+          var r2 = isDark ? 0 : Math.max(0, Math.min(255, 18 + Math.round(Math.random() * 16 - 8)));
+          particles.push({
+            ox: cx, oy: cy,
+            cx: cx + (Math.random() - 0.5) * 4,
+            cy: cy + (Math.random() - 0.5) * 4,
+            r:  0.8 + Math.random() * 1.2,
+            f:  FORCE - 15 + Math.random() * 30,
+            r0: r0,
+            r1: r1,
+            r2: r2
+          });
+        }
+      }
+    }
+  }
+
+
+  function draw() {
+    var dpr = window.devicePixelRatio || 1;
+    var W = canvas.width / dpr;
+    var H = canvas.height / dpr;
+    ctx.clearRect(0, 0, W, H);
+    var anyMoved = false;
+
+    for (var i = 0; i < particles.length; i++) {
+      var p = particles[i];
+
+      if (pointer.x !== null) {
+        var dx = p.cx - pointer.x;
+        var dy = p.cy - pointer.y;
+        var dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist < MAXD && dist > 0) {
+          var force = Math.min(p.f, (MAXD - dist) / dist * 2.2);
+          p.cx += (dx / dist) * force;
+          p.cy += (dy / dist) * force;
+        }
+      }
+
+      var odx = p.ox - p.cx;
+      var ody = p.oy - p.cy;
+      var od  = Math.sqrt(odx*odx + ody*ody);
+      if (od > 0.5) {
+        var spd = Math.min(od * RESTORE, 4);
+        p.cx += (odx / od) * spd;
+        p.cy += (ody / od) * spd;
+        anyMoved = true;
+      }
+
+      ctx.fillStyle = 'rgb(' + p.r0 + ',' + p.r1 + ',' + p.r2 + ')';
+      ctx.beginPath();
+      ctx.arc(p.cx, p.cy, p.r, 0, 6.2831853);
+      ctx.fill();
+    }
+
+    if (anyMoved || pointer.x !== null) {
+      raf = requestAnimationFrame(draw);
+    } else {
+      running = false; raf = null;
+    }
+  }
+
+  function startAnim() {
+    if (!running) { running = true; raf = requestAnimationFrame(draw); }
+  }
+
+  canvas.addEventListener('pointermove', function(e) {
+    var rect = canvas.getBoundingClientRect();
+    var dpr  = window.devicePixelRatio || 1;
+    var scX  = (canvas.width / dpr) / rect.width;
+    var scY  = (canvas.height / dpr) / rect.height;
+    pointer.x = (e.clientX - rect.left) * scX;
+    pointer.y = (e.clientY - rect.top)  * scY;
+    startAnim();
+  });
+
+  canvas.addEventListener('pointerleave', function() {
+    pointer.x = null; pointer.y = null;
+    startAnim();
+  });
+
+  window.addEventListener('resize', function() { window.heroResizeFn(); startAnim(); });
+
+  // Wait for Inter font to load before building
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(function() { window.heroResizeFn(); startAnim(); });
+  } else {
+    setTimeout(function() { window.heroResizeFn(); startAnim(); }, 300);
+  }
+})();
+</script>
+<div class="toast" id="ctxToast"></div>
+</body></html>

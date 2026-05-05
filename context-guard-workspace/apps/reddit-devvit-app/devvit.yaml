@@ -1,0 +1,9 @@
+name: context-guard
+version: 1.0.0
+description: Real-time comment edit diffing and mod alert dashboard for Reddit subreddits.
+permissions:
+  - modLog
+  - modMail
+  - read
+  - http
+products: []
