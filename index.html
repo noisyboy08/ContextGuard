@@ -774,7 +774,7 @@ header.scrolled{box-shadow:0 4px 30px rgba(0,0,0,.06)}
     <div class="nl-in">
       <h2>Stay ahead of bad actors.</h2>
       <p>Get weekly updates on ContextGuard features, moderation tips, and Reddit platform changes that affect your community.</p>
-      <div class="nl-form"><input type="email" placeholder="your@email.com"><button class="btn" style="border:none;padding:14px 28px">Subscribe</button></div>
+      <div class="nl-form"><input type="email" id="newsletter-email" name="newsletter-email" aria-label="Email address" placeholder="your@email.com"><button class="btn" style="border:none;padding:14px 28px">Subscribe</button></div>
     </div>
   </div>
     <footer class="site-footer">
@@ -846,15 +846,15 @@ header.scrolled{box-shadow:0 4px 30px rgba(0,0,0,.06)}
     </div>
     <div class="cf reveal-right">
       <div class="fr">
-        <div class="fg"><label>First Name</label><input type="text" placeholder="Alex"></div>
-        <div class="fg"><label>Last Name</label><input type="text" placeholder="Johnson"></div>
+        <div class="fg"><label for="contact-fname">First Name</label><input type="text" id="contact-fname" name="fname" placeholder="Alex"></div>
+        <div class="fg"><label for="contact-lname">Last Name</label><input type="text" id="contact-lname" name="lname" placeholder="Johnson"></div>
       </div>
-      <div class="fg"><label>Email</label><input type="email" placeholder="mod@subreddit.com"></div>
-      <div class="fg"><label>Subreddit</label><input type="text" placeholder="r/your_subreddit"></div>
-      <div class="fg"><label>Topic</label>
-        <select><option>Bug Report</option><option>Feature Request</option><option>Enterprise Inquiry</option><option>General Question</option></select>
+      <div class="fg"><label for="contact-email">Email</label><input type="email" id="contact-email" name="email" placeholder="mod@subreddit.com"></div>
+      <div class="fg"><label for="contact-sub">Subreddit</label><input type="text" id="contact-sub" name="subreddit" placeholder="r/your_subreddit"></div>
+      <div class="fg"><label for="contact-topic">Topic</label>
+        <select id="contact-topic" name="topic"><option>Bug Report</option><option>Feature Request</option><option>Enterprise Inquiry</option><option>General Question</option></select>
       </div>
-      <div class="fg"><label>Message</label><textarea rows="5" placeholder="Tell us about your moderation challenge..."></textarea></div>
+      <div class="fg"><label for="contact-msg">Message</label><textarea id="contact-msg" name="message" rows="5" placeholder="Tell us about your moderation challenge..."></textarea></div>
       <button class="btn" style="width:100%;padding:14px" onclick="submitContactForm(event)">Send Message</button>
     </div>
   </div>
